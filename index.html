@@ -213,7 +213,7 @@
             const overallLossLimitInput = document.getElementById('overallLossLimit');
             const maxRiskInput = document.getElementById('maxRisk');
 
-            let imageFiles = [];
+            let imageFileObjects = []; // Changed to store the file objects directly
             let userApiKey = localStorage.getItem('geminiApiKey'); // Retrieve key from localStorage
 
             const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=';
@@ -230,7 +230,7 @@
             [startingBalanceInput, profitTargetInput, dailyLossCapInput, overallLossLimitInput, maxRiskInput].forEach(input => {
                 input.addEventListener('input', () => {
                     const details = {
-                        startingBalance: startingBalanceInput.value,
+                        startingBalance: input.value,
                         profitTarget: profitTargetInput.value,
                         dailyLossCap: dailyLossCapInput.value,
                         overallLossLimit: overallLossLimitInput.value,
@@ -241,21 +241,20 @@
             });
 
             // Handle file processing for both click and drop events
-            function handleFiles(files) {
-                const validFiles = Array.from(files).slice(0, 4);
-                imageFiles = [];
+            function handleFiles(newFiles) {
+                const totalFiles = [...imageFileObjects, ...Array.from(newFiles)];
+                imageFileObjects = totalFiles.slice(0, 4);
+
+                // Clear previous previews
                 imagePreviewContainer.innerHTML = '';
-                
-                if (validFiles.length > 0) {
+
+                if (imageFileObjects.length > 0) {
                     fileInfoDiv.classList.add('hidden');
                     imagePreviewContainer.classList.remove('hidden');
                     
-                    validFiles.forEach(file => {
+                    imageFileObjects.forEach(file => {
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            const imageBase64 = e.target.result.split(',')[1];
-                            imageFiles.push({ data: imageBase64, mimeType: file.type });
-                            
                             const imgDiv = document.createElement('div');
                             imgDiv.className = 'w-full h-auto overflow-hidden rounded-lg';
                             const img = document.createElement('img');
@@ -265,6 +264,7 @@
                             imgDiv.appendChild(img);
                             imagePreviewContainer.appendChild(imgDiv);
                         };
+                        // This now reads the actual File object, not a custom object
                         reader.readAsDataURL(file);
                     });
                 } else {
@@ -297,7 +297,7 @@
             });
 
             analyzeBtn.addEventListener('click', async () => {
-                if (imageFiles.length === 0) {
+                if (imageFileObjects.length === 0) {
                     showError("Please upload at least one chart screenshot first.");
                     return;
                 }
@@ -315,6 +315,23 @@
                 const dailyLossCap = parseFloat(dailyLossCapInput.value) || 0;
                 const overallLossLimit = parseFloat(overallLossLimitInput.value) || 0;
                 const maxRisk = parseFloat(maxRiskInput.value) || 0;
+
+                // Asynchronously read all files before sending the request
+                const imageParts = await Promise.all(
+                    imageFileObjects.map(file => {
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve({
+                                inlineData: {
+                                    mimeType: file.type,
+                                    data: reader.result.split(',')[1]
+                                }
+                            });
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                    })
+                );
                 
                 // Construct the dynamic prompt with financial constraints
                 const prompt = `You are an intraday futures trading assistant. You analyze charts and market data strictly using one of three predefined strategies:
@@ -357,7 +374,7 @@ RULES:
                         {
                             parts: [
                                 { text: prompt },
-                                ...imageFiles.map(file => ({ inlineData: { mimeType: file.mimeType, data: file.data } }))
+                                ...imageParts
                             ]
                         }
                     ],
