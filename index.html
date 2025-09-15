@@ -82,6 +82,33 @@
 
         <h1 class="text-3xl sm:text-4xl font-semibold mb-4 text-white">Futures Chart Analysis</h1>
         <p class="text-sm sm:text-base text-gray-400 mb-8">Upload up to 4 chart screenshots from different timeframes to get a comprehensive analysis.</p>
+        
+        <!-- Funded Account Challenge Details -->
+        <div class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50 mb-6">
+            <h2 class="text-xl sm:text-2xl font-semibold mb-4 text-white">Funded Account Challenge Details</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                <div>
+                    <label for="startingBalance" class="block text-gray-400 text-sm font-medium mb-1">Starting Account Balance ($)</label>
+                    <input type="number" id="startingBalance" class="w-full bg-gray-900/40 border border-gray-600/50 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors duration-200" placeholder="e.g., 50000">
+                </div>
+                <div>
+                    <label for="profitTarget" class="block text-gray-400 text-sm font-medium mb-1">Profit Target (%)</label>
+                    <input type="number" id="profitTarget" class="w-full bg-gray-900/40 border border-gray-600/50 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors duration-200" placeholder="e.g., 8">
+                </div>
+                <div>
+                    <label for="dailyLossCap" class="block text-gray-400 text-sm font-medium mb-1">Daily Loss Cap (%)</label>
+                    <input type="number" id="dailyLossCap" class="w-full bg-gray-900/40 border border-gray-600/50 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors duration-200" placeholder="e.g., 5">
+                </div>
+                <div>
+                    <label for="overallLossLimit" class="block text-gray-400 text-sm font-medium mb-1">Overall Loss Limit (%)</label>
+                    <input type="number" id="overallLossLimit" class="w-full bg-gray-900/40 border border-gray-600/50 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors duration-200" placeholder="e.g., 10">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="maxRisk" class="block text-gray-400 text-sm font-medium mb-1">Max Risk per Trade (%)</label>
+                    <input type="number" id="maxRisk" class="w-full bg-gray-900/40 border border-gray-600/50 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors duration-200" placeholder="e.g., 1">
+                </div>
+            </div>
+        </div>
 
         <div class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50 mb-6 transition-all duration-300 hover:border-white/50 cursor-pointer">
             <input type="file" id="chartInput" accept="image/*" multiple class="hidden">
@@ -102,10 +129,10 @@
         </button>
 
         <div id="loading" class="mt-8 hidden">
-            <div class="flex items-center justify-center space-x-2 text-gray-400">
-                <div class="loading-spinner"></div>
-                <p>Analyzing charts, please wait...</p>
+            <div class="w-full bg-gray-700 rounded-full h-2.5 mb-4 overflow-hidden">
+                <div id="loadingBar" class="bg-white h-2.5 rounded-full transition-all duration-300 ease-in-out" style="width: 0%"></div>
             </div>
+            <p class="text-sm text-gray-400">Analyzing charts, please wait...</p>
         </div>
 
         <div id="result" class="mt-8 text-left space-y-6 hidden">
@@ -159,6 +186,7 @@
             const chartInput = document.getElementById('chartInput');
             const analyzeBtn = document.getElementById('analyzeBtn');
             const loadingDiv = document.getElementById('loading');
+            const loadingBar = document.getElementById('loadingBar');
             const resultDiv = document.getElementById('result');
             const summaryContent = document.getElementById('summaryContent');
             const pricesContent = document.getElementById('pricesContent');
@@ -173,10 +201,40 @@
             const apiKeyInput = document.getElementById('apiKeyInput');
             const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 
+            // Funded account detail inputs
+            const startingBalanceInput = document.getElementById('startingBalance');
+            const profitTargetInput = document.getElementById('profitTarget');
+            const dailyLossCapInput = document.getElementById('dailyLossCap');
+            const overallLossLimitInput = document.getElementById('overallLossLimit');
+            const maxRiskInput = document.getElementById('maxRisk');
+
             let imageFiles = [];
             let userApiKey = localStorage.getItem('geminiApiKey'); // Retrieve key from localStorage
 
             const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=';
+
+            // Load saved challenge details from localStorage
+            const savedChallengeDetails = JSON.parse(localStorage.getItem('challengeDetails')) || {};
+            startingBalanceInput.value = savedChallengeDetails.startingBalance || '';
+            profitTargetInput.value = savedChallengeDetails.profitTarget || '';
+            dailyLossCapInput.value = savedChallengeDetails.dailyLossCap || '';
+            overallLossLimitInput.value = savedChallengeDetails.overallLossLimit || '';
+            maxRiskInput.value = savedChallengeDetails.maxRisk || '';
+
+            // Save challenge details to localStorage on input change
+            [startingBalanceInput, profitTargetInput, dailyLossCapInput, overallLossLimitInput, maxRiskInput].forEach(input => {
+                input.addEventListener('input', () => {
+                    const details = {
+                        startingBalance: startingBalanceInput.value,
+                        profitTarget: profitTargetInput.value,
+                        dailyLossCap: dailyLossCapInput.value,
+                        overallLossLimit: overallLossLimitInput.value,
+                        maxRisk: maxRiskInput.value,
+                    };
+                    localStorage.setItem('challengeDetails', JSON.stringify(details));
+                });
+            });
+
 
             chartInput.addEventListener('change', (event) => {
                 const files = Array.from(event.target.files).slice(0, 4);
@@ -222,7 +280,15 @@
                 }
 
                 showLoading();
+
+                // Get the user-entered financial values
+                const startingBalance = parseFloat(startingBalanceInput.value) || 0;
+                const profitTarget = parseFloat(profitTargetInput.value) || 0;
+                const dailyLossCap = parseFloat(dailyLossCapInput.value) || 0;
+                const overallLossLimit = parseFloat(overallLossLimitInput.value) || 0;
+                const maxRisk = parseFloat(maxRiskInput.value) || 0;
                 
+                // Construct the dynamic prompt with financial constraints
                 const prompt = `You are an intraday futures trading assistant. You analyze charts and market data strictly using one of three predefined strategies:
 STRATEGY 1: Opening Range Breakout (ORB)
 - Define the first 15-minute range of the session.
@@ -243,6 +309,12 @@ INSTRUCTIONS:
 - You will be given up to four chart screenshots, each representing a different timeframe.
 - Identify the timeframe for each chart (e.g., 5-minute, 15-minute, 1-hour, 4-hour).
 - Evaluate all three strategies across all provided timeframes to determine the most optimal single trade setup. Consider multi-timeframe analysis for confluence.
+- IMPORTANT: The analysis must align with the following financial constraints for a funded account challenge:
+  - Starting Account Balance: ${startingBalance}
+  - Profit Target: ${profitTarget}%
+  - Daily Loss Cap: ${dailyLossCap}%
+  - Overall Loss Limit: ${overallLossLimit}%
+  - Max Risk per Trade: ${maxRisk}% of starting balance.
 - Return your analysis in a JSON format. Your response MUST be a JSON object with the keys 'strategy_used' (string), 'timeframe' (string), 'entry_price' (number), 'stop_loss' (number), 'take_profit' (number), and 'reasoning' (string). The prices must be numbers, not strings, and be rounded to two decimal places.
 RULES:
 - Do not invent new strategies.
@@ -339,10 +411,21 @@ RULES:
                 loadingDiv.classList.remove('hidden');
                 resultDiv.classList.add('hidden');
                 errorDiv.classList.add('hidden');
+                // Simulate loading bar progress
+                let width = 0;
+                const interval = setInterval(() => {
+                    width += 5;
+                    if (width <= 95) {
+                        loadingBar.style.width = `${width}%`;
+                    } else {
+                        clearInterval(interval);
+                    }
+                }, 100);
             }
 
             function hideLoading() {
                 loadingDiv.classList.add('hidden');
+                loadingBar.style.width = '0%';
             }
 
             function displayResult(result) {
