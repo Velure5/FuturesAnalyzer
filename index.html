@@ -68,6 +68,10 @@
             width: 90%;
             position: relative;
         }
+        .drag-over {
+            border-color: rgba(255, 255, 255, 0.5) !important;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -110,7 +114,7 @@
             </div>
         </div>
 
-        <div class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50 mb-6 transition-all duration-300 hover:border-white/50 cursor-pointer">
+        <div id="dropzone" class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50 mb-6 transition-all duration-300 hover:border-white/50 cursor-pointer">
             <input type="file" id="chartInput" accept="image/*" multiple class="hidden">
             <label for="chartInput" class="w-full h-full block">
                 <div id="fileInfo" class="flex flex-col items-center justify-center p-8">
@@ -195,6 +199,7 @@
             const errorContent = document.getElementById('errorContent');
             const fileInfoDiv = document.getElementById('fileInfo');
             const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+            const dropzone = document.getElementById('dropzone');
             const settingsBtn = document.getElementById('settingsBtn');
             const settingsModal = document.getElementById('settingsModal');
             const closeModalBtn = document.getElementById('closeModalBtn');
@@ -235,17 +240,17 @@
                 });
             });
 
-
-            chartInput.addEventListener('change', (event) => {
-                const files = Array.from(event.target.files).slice(0, 4);
+            // Handle file processing for both click and drop events
+            function handleFiles(files) {
+                const validFiles = Array.from(files).slice(0, 4);
                 imageFiles = [];
                 imagePreviewContainer.innerHTML = '';
                 
-                if (files.length > 0) {
+                if (validFiles.length > 0) {
                     fileInfoDiv.classList.add('hidden');
                     imagePreviewContainer.classList.remove('hidden');
                     
-                    files.forEach(file => {
+                    validFiles.forEach(file => {
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             const imageBase64 = e.target.result.split(',')[1];
@@ -265,6 +270,29 @@
                 } else {
                     fileInfoDiv.classList.remove('hidden');
                     imagePreviewContainer.classList.add('hidden');
+                }
+            }
+
+            // Event listener for file input change
+            chartInput.addEventListener('change', (event) => {
+                handleFiles(event.target.files);
+            });
+
+            // Event listeners for drag and drop
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('drag-over');
+            });
+
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('drag-over');
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-over');
+                if (e.dataTransfer.files) {
+                    handleFiles(e.dataTransfer.files);
                 }
             });
 
