@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futures Trading Analysis Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d0d0d;
+            background-image: radial-gradient(at 0% 0%, #1a1a1a 0%, #0d0d0d 70%);
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .glass-container {
+            position: relative;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.125);
+            border-radius: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            padding: 2.5rem;
+            max-width: 800px;
+            width: 100%;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top: 4px solid #ffffff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glass-container text-center">
+        <h1 class="text-3xl sm:text-4xl font-semibold mb-4 text-white">Futures Chart Analysis</h1>
+        <p class="text-sm sm:text-base text-gray-400 mb-8">Upload up to 4 chart screenshots from different timeframes to get a comprehensive analysis.</p>
+
+        <div class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50 mb-6 transition-all duration-300 hover:border-white/50 cursor-pointer">
+            <input type="file" id="chartInput" accept="image/*" multiple class="hidden">
+            <label for="chartInput" class="w-full h-full block">
+                <div id="fileInfo" class="flex flex-col items-center justify-center p-8">
+                    <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <p class="mt-2 text-gray-400 font-medium">Click or drag charts here</p>
+                    <p class="text-xs text-gray-500 mt-1">PNG or JPG files up to 5MB each</p>
+                </div>
+                <div id="imagePreviewContainer" class="mt-4 hidden grid grid-cols-2 gap-4"></div>
+            </label>
+        </div>
+
+        <button id="analyzeBtn" class="bg-white text-black font-semibold py-3 px-6 rounded-xl w-full transition-all duration-200 hover:bg-gray-200 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:ring-opacity-50 active:scale-95">
+            Analyze Charts
+        </button>
+
+        <div id="loading" class="mt-8 hidden">
+            <div class="flex items-center justify-center space-x-2 text-gray-400">
+                <div class="loading-spinner"></div>
+                <p>Analyzing charts, please wait...</p>
+            </div>
+        </div>
+
+        <div id="result" class="mt-8 text-left space-y-6 hidden">
+            <!-- Strategy & Timeframe Box -->
+            <div id="summaryBox" class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50">
+                <h2 class="text-xl sm:text-2xl font-semibold mb-2 text-white">Recommended Setup</h2>
+                <div id="summaryContent" class="text-gray-300 leading-relaxed"></div>
+            </div>
+
+            <!-- Prices Box -->
+            <div id="pricesBox" class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50">
+                <h2 class="text-xl sm:text-2xl font-semibold mb-2 text-white">Suggested Prices</h2>
+                <div id="pricesContent" class="text-gray-300 leading-relaxed grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+            </div>
+
+            <!-- Rationale Box -->
+            <div id="rationaleBox" class="bg-gray-800/20 p-6 rounded-xl border border-gray-600/50">
+                <h2 class="text-xl sm:text-2xl font-semibold mb-2 text-white">Technical Rationale</h2>
+                <div id="rationaleContent" class="text-gray-300 leading-relaxed"></div>
+            </div>
+        </div>
+
+        <div id="error" class="mt-8 text-left bg-red-900/30 text-red-300 p-6 rounded-xl border border-red-700/50 hidden">
+            <h2 class="text-xl sm:text-2xl font-semibold mb-4">Error</h2>
+            <p id="errorContent"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const chartInput = document.getElementById('chartInput');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loadingDiv = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+            const summaryContent = document.getElementById('summaryContent');
+            const pricesContent = document.getElementById('pricesContent');
+            const rationaleContent = document.getElementById('rationaleContent');
+            const errorDiv = document.getElementById('error');
+            const errorContent = document.getElementById('errorContent');
+            const fileInfoDiv = document.getElementById('fileInfo');
+            const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+            
+            let imageFiles = [];
+
+            // Global variables for Firebase - kept for Canvas environment
+            const __app_id = 'futures-trading-tool';
+            const __firebase_config = '{}';
+            const __initial_auth_token = '';
+
+            const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=';
+            const apiKey = "";
+
+            chartInput.addEventListener('change', (event) => {
+                const files = Array.from(event.target.files).slice(0, 4);
+                imageFiles = [];
+                imagePreviewContainer.innerHTML = '';
+                
+                if (files.length > 0) {
+                    fileInfoDiv.classList.add('hidden');
+                    imagePreviewContainer.classList.remove('hidden');
+                    
+                    files.forEach(file => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const imageBase64 = e.target.result.split(',')[1];
+                            imageFiles.push({ data: imageBase64, mimeType: file.type });
+                            
+                            const imgDiv = document.createElement('div');
+                            imgDiv.className = 'w-full h-auto overflow-hidden rounded-lg';
+                            const img = document.createElement('img');
+                            img.src = e.target.result;
+                            img.alt = file.name;
+                            img.className = 'w-full h-full object-cover';
+                            imgDiv.appendChild(img);
+                            imagePreviewContainer.appendChild(imgDiv);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                } else {
+                    fileInfoDiv.classList.remove('hidden');
+                    imagePreviewContainer.classList.add('hidden');
+                }
+            });
+
+            analyzeBtn.addEventListener('click', async () => {
+                if (imageFiles.length === 0) {
+                    showError("Please upload at least one chart screenshot first.");
+                    return;
+                }
+
+                showLoading();
+                
+                const prompt = `You are an intraday futures trading assistant. You analyze charts and market data strictly using one of three predefined strategies:
+STRATEGY 1: Opening Range Breakout (ORB)
+- Define the first 15-minute range of the session.
+- Entry: Break above/below that range.
+- Stop Loss (SL): Opposite side of the range.
+- Take Profit (TP): 1.5–2× stop distance.
+STRATEGY 2: VWAP Pullback Reversal
+- Identify trend direction relative to VWAP.
+- Entry: Enter on pullback to VWAP in trend direction.
+- SL: Few ticks beyond VWAP.
+- TP: 2× stop distance or last swing high/low.
+STRATEGY 3: Support/Resistance Break & Retest
+- Identify key support/resistance levels (overnight high/low, yesterday’s high/low, pivots).
+- Entry: After breakout and successful retest of the level.
+- SL: Just beyond the retested level.
+- TP: Next key level or 2× stop distance.
+INSTRUCTIONS:
+- You will be given up to four chart screenshots, each representing a different timeframe.
+- Identify the timeframe for each chart (e.g., 5-minute, 15-minute, 1-hour, 4-hour).
+- Evaluate all three strategies across all provided timeframes to determine the most optimal single trade setup. Consider multi-timeframe analysis for confluence.
+- Return your analysis in a JSON format. Your response MUST be a JSON object with the keys 'strategy_used' (string), 'timeframe' (string), 'entry_price' (number), 'stop_loss' (number), 'take_profit' (number), and 'reasoning' (string). The prices must be numbers, not strings, and be rounded to two decimal places.
+RULES:
+- Do not invent new strategies.
+- Always provide entry, stop loss, and take profit.
+- Round all prices to 2 decimals.
+- Keep reasoning concise (1–3 sentences).
+- If no clear strategy is valid across all provided charts, respond with:
+{ "strategy_used": "None", "timeframe": "N/A", "entry_price": 0, "stop_loss": 0, "take_profit": 0, "reasoning": "No valid setup at this time. Wait for clearer conditions." }`;
+
+                const payload = {
+                    contents: [
+                        {
+                            parts: [
+                                { text: prompt },
+                                ...imageFiles.map(file => ({ inlineData: { mimeType: file.mimeType, data: file.data } }))
+                            ]
+                        }
+                    ],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "strategy_used": { "type": "STRING" },
+                                "timeframe": { "type": "STRING" },
+                                "entry_price": { "type": "NUMBER" },
+                                "stop_loss": { "type": "NUMBER" },
+                                "take_profit": { "type": "NUMBER" },
+                                "reasoning": { "type": "STRING" }
+                            },
+                            "required": ["strategy_used", "timeframe", "entry_price", "stop_loss", "take_profit", "reasoning"]
+                        }
+                    }
+                };
+
+                let attempt = 0;
+                const maxAttempts = 3;
+                while (attempt < maxAttempts) {
+                    try {
+                        const response = await fetch(geminiApiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const result = await response.json();
+
+                        if (!response.ok || !result.candidates || result.candidates.length === 0) {
+                            throw new Error('API response failed or was empty.');
+                        }
+                        
+                        const jsonText = result.candidates[0]?.content?.parts[0]?.text;
+                        if (jsonText) {
+                            hideLoading();
+                            displayResult(JSON.parse(jsonText));
+                            return;
+                        } else {
+                            throw new Error('No JSON content in the API response.');
+                        }
+                    } catch (e) {
+                        console.error(`Attempt ${attempt + 1} failed:`, e);
+                        attempt++;
+                        if (attempt < maxAttempts) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+                        } else {
+                            hideLoading();
+                            showError("Failed to analyze the charts. Please try again later.");
+                        }
+                    }
+                }
+            });
+
+            function showLoading() {
+                loadingDiv.classList.remove('hidden');
+                resultDiv.classList.add('hidden');
+                errorDiv.classList.add('hidden');
+            }
+
+            function hideLoading() {
+                loadingDiv.classList.add('hidden');
+            }
+
+            function displayResult(result) {
+                if (result.strategy_used === "None") {
+                    document.getElementById('summaryBox').classList.add('hidden');
+                    document.getElementById('pricesBox').classList.add('hidden');
+                    document.getElementById('rationaleBox').classList.remove('hidden');
+                    rationaleContent.innerHTML = result.reasoning;
+                } else {
+                    document.getElementById('summaryBox').classList.remove('hidden');
+                    document.getElementById('pricesBox').classList.remove('hidden');
+                    document.getElementById('rationaleBox').classList.remove('hidden');
+                    
+                    summaryContent.innerHTML = `
+                        <p class="text-xl sm:text-2xl font-semibold mb-2 text-white">${result.strategy_used}</p>
+                        <p class="text-base text-gray-400">Timeframe: <span class="text-white">${result.timeframe}</span></p>
+                    `;
+                    rationaleContent.innerHTML = result.reasoning;
+                    
+                    pricesContent.innerHTML = `
+                        <div class="bg-gray-900/40 p-4 rounded-xl text-center">
+                            <p class="text-sm text-gray-400 font-semibold mb-1">Entry Price</p>
+                            <p class="text-lg font-bold text-white">${result.entry_price.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-gray-900/40 p-4 rounded-xl text-center">
+                            <p class="text-sm text-gray-400 font-semibold mb-1">Take Profit (TP)</p>
+                            <p class="text-lg font-bold text-white">${result.take_profit.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-gray-900/40 p-4 rounded-xl text-center">
+                            <p class="text-sm text-gray-400 font-semibold mb-1">Stop Loss (SL)</p>
+                            <p class="text-lg font-bold text-white">${result.stop_loss.toFixed(2)}</p>
+                        </div>
+                    `;
+                }
+                
+                resultDiv.classList.remove('hidden');
+            }
+
+            function showError(message) {
+                errorContent.textContent = message;
+                errorDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
