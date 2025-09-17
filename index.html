@@ -360,12 +360,11 @@ INSTRUCTIONS:
   - Daily Loss Cap: ${dailyLossCap}%
   - Overall Loss Limit: ${overallLossLimit}%
   - Max Risk per Trade: ${maxRisk}% of starting balance.
-- Return your analysis in a JSON format. Your response MUST be a JSON object with the keys 'strategy_used' (string), 'timeframe' (string), 'entry_price' (number), 'stop_loss' (number), 'take_profit' (number), and 'reasoning' (string). The prices must be numbers, not strings, and be rounded to two decimal places.
+- Return your analysis in a JSON format. Your response MUST be a JSON object with the keys 'strategy_used' (string), 'timeframe' (string), 'entry_price' (number), 'stop_loss' (number), 'take_profit' (number), and 'reasoning' (string). The prices must be numbers, not strings, and be provided with full decimal precision.
 RULES:
 - Do not invent new strategies.
 - Always provide entry, stop loss, and take profit.
-- Show all prices completely including all decimals available.
-- in the suggested pricing section, include as many decimals possible for the price. 
+- Provide all prices with full decimal precision.
 - Keep reasoning concise (1–3 sentences).
 - If no clear strategy is valid across all provided charts, respond with:
 { "strategy_used": "None", "timeframe": "N/A", "entry_price": 0, "stop_loss": 0, "take_profit": 0, "reasoning": "No valid setup at this time. Wait for clearer conditions." }`;
@@ -494,15 +493,15 @@ RULES:
                     pricesContent.innerHTML = `
                         <div class="bg-gray-900/40 p-4 rounded-xl text-center">
                             <p class="text-sm text-gray-400 font-semibold mb-1">Entry Price</p>
-                            <p class="text-lg font-bold text-white">${result.entry_price.toFixed(2)}</p>
+                            <p class="text-lg font-bold text-white">${result.entry_price}</p>
                         </div>
                         <div class="bg-gray-900/40 p-4 rounded-xl text-center">
                             <p class="text-sm text-gray-400 font-semibold mb-1">Take Profit (TP)</p>
-                            <p class="text-lg font-bold text-white">${result.take_profit.toFixed(2)}</p>
+                            <p class="text-lg font-bold text-white">${result.take_profit}</p>
                         </div>
                         <div class="bg-gray-900/40 p-4 rounded-xl text-center">
                             <p class="text-sm text-gray-400 font-semibold mb-1">Stop Loss (SL)</p>
-                            <p class="text-lg font-bold text-white">${result.stop_loss.toFixed(2)}</p>
+                            <p class="text-lg font-bold text-white">${result.stop_loss}</p>
                         </div>
                     `;
                 }
